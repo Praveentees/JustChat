@@ -43,8 +43,6 @@ class ChatListActivity : ComponentActivity() {
     }
 }
 
-data class ChatItem(val name: String, val lastMessage: String, val timestamp: Long)
-
 @Composable
 fun ChatListScreen(auth: FirebaseAuth) {
     val context = LocalContext.current
@@ -52,19 +50,26 @@ fun ChatListScreen(auth: FirebaseAuth) {
     val userName = user?.displayName ?: user?.email ?: "User"
 
     var selectedTab by remember { mutableIntStateOf(0) }
+    val db = FirebaseFirestore.getInstance()
+    var contacts by remember { mutableStateOf(listOf<Map<String, Any>>()) }
 
-    val dummyChats = listOf(
-        ChatItem("Alice", "Hey! Are we meeting today?", System.currentTimeMillis() - 300000),
-        ChatItem("Bob", "Sure, I’ll send the file soon.", System.currentTimeMillis() - 600000),
-        ChatItem("Charlie", "....", System.currentTimeMillis() - 900000)
-    )
+    LaunchedEffect(Unit) {
+        user?.uid?.let { uid ->
+            db.collection("users")
+                .document(uid)
+                .collection("contacts")
+                .addSnapshotListener { snapshot, e ->
+                    if (e != null || snapshot == null) return@addSnapshotListener
+                    contacts = snapshot.documents.mapNotNull { it.data }
+                }
+        }
+    }
 
     Scaffold(
         bottomBar = {
             BottomNavigationBar(selectedTab) { selectedTab = it }
         },
-        modifier = Modifier
-            .padding(WindowInsets.systemBars.asPaddingValues())
+        modifier = Modifier.padding(WindowInsets.systemBars.asPaddingValues())
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -83,8 +88,7 @@ fun ChatListScreen(auth: FirebaseAuth) {
                     onClick = {
                         auth.signOut()
                         Toast.makeText(context, "Logged out", Toast.LENGTH_SHORT).show()
-                        val intent = Intent(context, LoginActivity::class.java)
-                        context.startActivity(intent)
+                        context.startActivity(Intent(context, LoginActivity::class.java))
                     }
                 ) {
                     Text("Logout")
@@ -97,18 +101,34 @@ fun ChatListScreen(auth: FirebaseAuth) {
                 0 -> {
                     Text("Recent Chats", style = MaterialTheme.typography.headlineSmall)
                     Spacer(modifier = Modifier.height(8.dp))
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(dummyChats) { chat ->
-                            ChatItemCard(chat)
+                    if (contacts.isEmpty()) {
+                        Text("No contacts yet. Add some to start chatting.")
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(contacts) { contact ->
+                                ChatItemCard(
+                                    name = contact["name"] as? String ?: "Unknown",
+                                    lastMessage = "Tap to start chat",
+                                    onClick = {
+                                        val intent = Intent(context, ChatActivity::class.java).apply {
+                                            putExtra("name", contact["name"] as? String ?: "")
+                                            putExtra("email", contact["email"] as? String ?: "")
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
+
                 1 -> {
                     AddContactSection(
                         currentUserId = user?.uid ?: "",
                         userEmail = user?.email ?: ""
                     )
                 }
+
                 2 -> {
                     Text("Profile", style = MaterialTheme.typography.headlineSmall)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -121,21 +141,17 @@ fun ChatListScreen(auth: FirebaseAuth) {
 }
 
 @Composable
-fun ChatItemCard(chat: ChatItem) {
-    val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val time = sdf.format(Date(chat.timestamp))
-
+fun ChatItemCard(name: String, lastMessage: String, onClick: () -> Unit) {
+    val time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                // TODO: Navigate to ChatScreen(chat.name)
-            },
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(chat.name, style = MaterialTheme.typography.titleMedium)
-            Text(chat.lastMessage, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            Text(name, style = MaterialTheme.typography.titleMedium)
+            Text(lastMessage, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
             Text(time, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
         }
     }
@@ -174,7 +190,6 @@ fun AddContactSection(currentUserId: String, userEmail: String) {
     var email by remember { mutableStateOf("") }
     var contactList by remember { mutableStateOf(listOf<Map<String, Any>>()) }
 
-    // Realtime listener
     LaunchedEffect(Unit) {
         db.collection("users")
             .document(currentUserId)
@@ -190,16 +205,16 @@ fun AddContactSection(currentUserId: String, userEmail: String) {
             value = name,
             onValueChange = { name = it },
             label = { Text("Contact Name") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
         )
 
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
             label = { Text("Contact Email") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
         )
 
         Button(
