@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.justchat.ui.theme.JustChatTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.runtime.mutableIntStateOf
@@ -103,9 +104,10 @@ fun ChatListScreen(auth: FirebaseAuth) {
                     }
                 }
                 1 -> {
-                    Text("Add Contact", style = MaterialTheme.typography.headlineSmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Feature coming soon...", style = MaterialTheme.typography.bodyLarge)
+                    AddContactSection(
+                        currentUserId = user?.uid ?: "",
+                        userEmail = user?.email ?: ""
+                    )
                 }
                 2 -> {
                     Text("Profile", style = MaterialTheme.typography.headlineSmall)
@@ -160,5 +162,87 @@ fun BottomNavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             icon = { Icon(Icons.Default.AccountCircle, contentDescription = "Profile") },
             label = { Text("Profile") }
         )
+    }
+}
+
+@Composable
+fun AddContactSection(currentUserId: String, userEmail: String) {
+    val context = LocalContext.current
+    val db = FirebaseFirestore.getInstance()
+
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var contactList by remember { mutableStateOf(listOf<Map<String, Any>>()) }
+
+    // Realtime listener
+    LaunchedEffect(Unit) {
+        db.collection("users")
+            .document(currentUserId)
+            .collection("contacts")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null || snapshot == null) return@addSnapshotListener
+                contactList = snapshot.documents.mapNotNull { it.data }
+            }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Contact Name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Contact Email") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Button(
+            onClick = {
+                if (name.isNotBlank() && email.isNotBlank()) {
+                    val contact = mapOf(
+                        "name" to name,
+                        "email" to email,
+                        "addedAt" to System.currentTimeMillis()
+                    )
+                    db.collection("users")
+                        .document(currentUserId)
+                        .collection("contacts")
+                        .add(contact)
+                        .addOnSuccessListener {
+                            Toast.makeText(context, "Contact added!", Toast.LENGTH_SHORT).show()
+                            name = ""
+                            email = ""
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(context, "Failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                        }
+                } else {
+                    Toast.makeText(context, "All fields are required", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Save Contact")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Your Contacts", style = MaterialTheme.typography.titleMedium)
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(contactList) { contact ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("Name: ${contact["name"]}")
+                        Text("Email: ${contact["email"]}")
+                    }
+                }
+            }
+        }
     }
 }
