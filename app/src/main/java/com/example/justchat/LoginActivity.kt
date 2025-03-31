@@ -1,5 +1,6 @@
 package com.example.justchat
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -10,37 +11,42 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import com.example.justchat.ui.theme.JustChatTheme
-import com.example.justchat.R
+import com.google.firebase.auth.FirebaseAuth
 
 class LoginActivity : ComponentActivity() {
+    private lateinit var auth: FirebaseAuth
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize Firebase Auth
+        auth = FirebaseAuth.getInstance()
+
         setContent {
             JustChatTheme {
-                LoginScreen()
+                LoginScreen(auth)
             }
         }
     }
 }
 
 @Composable
-fun LoginScreen() {
+fun LoginScreen(auth: FirebaseAuth) {
     val context = LocalContext.current
 
     var isEmailLogin by remember { mutableStateOf(true) }
     var emailOrPhone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Country codes map
     val countryCodes = mapOf(
         "🇺🇸 USA" to "+1",
         "🇮🇳 India" to "+91",
@@ -51,12 +57,7 @@ fun LoginScreen() {
     var selectedCountry by remember { mutableStateOf("🇮🇳 India") }
     var expanded by remember { mutableStateOf(false) }
 
-    val isValidEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(emailOrPhone).matches()
-    val isValidPhone = android.util.Patterns.PHONE.matcher(emailOrPhone).matches()
-    val isPasswordValid = password.length >= 6
-
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background
         Image(
             painter = painterResource(id = R.drawable.background),
             contentDescription = null,
@@ -64,7 +65,6 @@ fun LoginScreen() {
             contentScale = ContentScale.Crop
         )
 
-        // Overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -83,7 +83,6 @@ fun LoginScreen() {
                 style = MaterialTheme.typography.headlineMedium
             )
 
-            // Country code dropdown + Phone input (only for phone login)
             if (!isEmailLogin) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -120,7 +119,6 @@ fun LoginScreen() {
                 }
             }
 
-            // Email input if email login
             if (isEmailLogin) {
                 OutlinedTextField(
                     value = emailOrPhone,
@@ -132,7 +130,6 @@ fun LoginScreen() {
                 )
             }
 
-            // Password
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -143,17 +140,32 @@ fun LoginScreen() {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Existing Login Button
             Button(
                 onClick = {
                     val phoneWithCode = "${countryCodes[selectedCountry]}$emailOrPhone"
+                    val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(emailOrPhone).matches()
                     val isPhoneValid = android.util.Patterns.PHONE.matcher(phoneWithCode).matches()
+                    val isPasswordValid = password.length >= 6
 
-                    if ((isEmailLogin && isValidEmail || !isEmailLogin && isPhoneValid) && isPasswordValid) {
-                        Toast.makeText(context, "Login Successful!", Toast.LENGTH_SHORT).show()
-                        // TODO: Navigate to home
+                    if (isEmailLogin) {
+                        if (isEmailValid && isPasswordValid) {
+                            auth.signInWithEmailAndPassword(emailOrPhone.trim(), password)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        Toast.makeText(context, "Login Successful!", Toast.LENGTH_SHORT).show()
+
+                                        // ✅ Navigate to ChatsActivity (ChatListActivity)
+                                        val intent = Intent(context, ChatListActivity::class.java)
+                                        context.startActivity(intent)
+                                    } else {
+                                        Toast.makeText(context, "Login Failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                        } else {
+                            Toast.makeText(context, "Invalid email or password", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
-                        Toast.makeText(context, "Invalid credentials", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Phone login is not implemented in Firebase yet", Toast.LENGTH_LONG).show()
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -161,24 +173,20 @@ fun LoginScreen() {
                 Text("Login")
             }
 
-// Toggle method
+
             TextButton(onClick = { isEmailLogin = !isEmailLogin }) {
                 Text("Switch to ${if (isEmailLogin) "Phone" else "Email"} Login")
             }
 
-//  New Register Button (Always visible)
             TextButton(
                 onClick = {
-                    val intent = android.content.Intent(context, RegisterActivity::class.java)
+                    val intent = Intent(context, RegisterActivity::class.java)
                     context.startActivity(intent)
                 },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
                 Text("Don't have an account? Sign up")
             }
-
         }
     }
 }
-
-

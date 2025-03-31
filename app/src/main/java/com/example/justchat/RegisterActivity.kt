@@ -1,5 +1,6 @@
 package com.example.justchat
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -19,21 +20,27 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import com.example.justchat.ui.theme.JustChatTheme
-import com.example.justchat.R
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 
 class RegisterActivity : ComponentActivity() {
+    private lateinit var auth: FirebaseAuth
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        auth = FirebaseAuth.getInstance()
+
         setContent {
             JustChatTheme {
-                RegisterScreen()
+                RegisterScreen(auth)
             }
         }
     }
 }
 
 @Composable
-fun RegisterScreen() {
+fun RegisterScreen(auth: FirebaseAuth) {
     val context = LocalContext.current
 
     var fullName by remember { mutableStateOf("") }
@@ -99,7 +106,6 @@ fun RegisterScreen() {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Phone with country code
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -147,8 +153,24 @@ fun RegisterScreen() {
             Button(
                 onClick = {
                     if (isFullNameValid && isEmailValid && isPhoneValid && isPasswordValid) {
-                        Toast.makeText(context, "Registration successful!", Toast.LENGTH_SHORT).show()
-                        // TODO: Handle actual registration logic or navigate to home
+                        auth.createUserWithEmailAndPassword(email.trim(), password)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    val user = auth.currentUser
+                                    val profileUpdates = UserProfileChangeRequest.Builder()
+                                        .setDisplayName(fullName.trim())
+                                        .build()
+                                    user?.updateProfile(profileUpdates)
+
+                                    Toast.makeText(context, "Registration successful!", Toast.LENGTH_SHORT).show()
+
+                                    // Optionally go to home or login
+                                    val intent = Intent(context, LoginActivity::class.java)
+                                    context.startActivity(intent)
+                                } else {
+                                    Toast.makeText(context, "Registration failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
                     } else {
                         Toast.makeText(context, "Please check your inputs", Toast.LENGTH_SHORT).show()
                     }
@@ -160,4 +182,3 @@ fun RegisterScreen() {
         }
     }
 }
-
