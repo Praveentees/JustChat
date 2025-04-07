@@ -9,15 +9,15 @@ class ChatActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Get contact data from intent
-        val contactName = intent.getStringExtra("name") ?: "Unknown"
-        val contactEmail = intent.getStringExtra("email") ?: ""
+        val name = intent.getStringExtra("contactName") ?: "Unknown"
+        val email = intent.getStringExtra("contactEmail") ?: ""
 
         setContent {
             JustChatTheme {
-                ChatScreen(contactName = contactName, contactEmail = contactEmail)
+                ChatScreen(contactName = name, contactEmail = email)
             }
         }
     }
 }
+
 

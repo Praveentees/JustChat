@@ -106,19 +106,20 @@ fun ChatListScreen(auth: FirebaseAuth) {
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(contacts) { contact ->
-                                ChatItemCard(
-                                    name = contact["name"] as? String ?: "Unknown",
-                                    lastMessage = "Tap to start chat",
-                                    onClick = {
-                                        val intent = Intent(context, ChatActivity::class.java).apply {
-                                            putExtra("name", contact["name"] as? String ?: "")
-                                            putExtra("email", contact["email"] as? String ?: "")
-                                        }
-                                        context.startActivity(intent)
+                                val name = contact["name"] as? String ?: "Unknown"
+                                val email = contact["email"] as? String ?: return@items
+
+                                ChatItemCard(name, email) {
+                                    val intent = Intent(context, ChatActivity::class.java).apply {
+                                        putExtra("contactName", name)
+                                        putExtra("contactEmail", email)
                                     }
-                                )
+                                    context.startActivity(intent)
+                                }
                             }
                         }
+
+                    }
                     }
                 }
 
@@ -141,8 +142,10 @@ fun ChatListScreen(auth: FirebaseAuth) {
 }
 
 @Composable
-fun ChatItemCard(name: String, lastMessage: String, onClick: () -> Unit) {
-    val time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+fun ChatItemCard(name: String, email: String, onClick: () -> Unit) {
+    val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    val time = sdf.format(Date())
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -151,11 +154,12 @@ fun ChatItemCard(name: String, lastMessage: String, onClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
-            Text(lastMessage, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            Text("Tap to chat", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
             Text(time, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
         }
     }
 }
+
 
 @Composable
 fun BottomNavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
