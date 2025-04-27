@@ -118,8 +118,6 @@ fun ChatListScreen(auth: FirebaseAuth) {
                                 }
                             }
                         }
-
-                    }
                     }
                 }
 
@@ -159,7 +157,6 @@ fun ChatItemCard(name: String, email: String, onClick: () -> Unit) {
         }
     }
 }
-
 
 @Composable
 fun BottomNavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
